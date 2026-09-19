@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق مُتْقَن</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary: #1A365D; 
+            --secondary: #F59E0B; 
+            --bg-color: #F8FAFC; 
+            --card-bg: #ffffff;
+            --text-dark: #1f2937;
+            --text-gray: #64748b;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #cbd5e1; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+
+        #app-container {
+            width: 100%; max-width: 414px; height: 100vh; max-height: 896px;
+            background-color: var(--bg-color); position: relative; overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column;
+        }
+
+        @media (min-width: 415px) {
+            #app-container { height: 896px; border-radius: 40px; border: 8px solid #1e293b; }
+        }
+
+        .screen { display: none !important; flex-direction: column; height: 100%; overflow-y: auto; background-color: var(--bg-color); padding-bottom: 80px; }
+        .screen.active { display: flex !important; }
+
+        /* Headers */
+        .header { background-color: var(--card-bg); padding: 20px; text-align: center; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .header h2 { color: var(--primary); font-size: 1.2rem; margin: 0 auto; font-weight: bold; }
+        .back-btn { background: none; border: none; font-size: 1.2rem; color: var(--primary); cursor: pointer; position: absolute; right: 20px; }
+
+        /* Home Top Bar */
+        .home-top-bar { display: flex; justify-content: space-between; align-items: center; padding: 20px; background-color: var(--card-bg); border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; }
+        .notification-btn { width: 40px; height: 40px; background-color: #f1f5f9; color: var(--primary); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; border: none; cursor: pointer; position: relative; }
+        .badge { position: absolute; top: 0; right: 0; background: var(--secondary); width: 10px; height: 10px; border-radius: 50%; display: none; }
+        .location-info { text-align: left; display: flex; flex-direction: column; align-items: flex-end; }
+        .location-info span { color: var(--text-gray); font-size: 0.8rem; }
+        .location-info strong { color: var(--text-dark); font-size: 0.95rem; display: flex; align-items: center; gap: 5px; }
+        .location-info strong i { color: var(--danger); }
+
+        /* Grid & Cards */
+        .services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 0 20px 20px; }
+        .service-card { background-color: var(--card-bg); padding: 20px 10px; border-radius: 16px; text-align: center; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.03); transition: transform 0.2s;}
+        .service-card:active { transform: scale(0.95); }
+        .service-icon { width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 0 auto 15px; }
+        
+        .icon-plumbing { background-color: #ccfbf1; color: #14b8a6; }
+        .icon-electric { background-color: #fef3c7; color: #f59e0b; }
+        .icon-ac { background-color: #dbeafe; color: #3b82f6; }
+        .icon-car { background-color: #f1f5f9; color: #475569; }
+        .icon-paint { background-color: #f3e8ff; color: #a855f7; }
+        .icon-wood { background-color: #ffedd5; color: #f97316; }
+
+        /* Worker List & Chat */
+        .provider-card { background: var(--card-bg); margin: 10px 20px; padding: 15px; border-radius: 12px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .provider-img { width: 60px; height: 60px; border-radius: 12px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--primary); }
+        .provider-info { flex: 1; }
+        .provider-name { font-weight: bold; color: var(--text-dark); margin-bottom: 5px; }
+        .provider-meta { font-size: 0.85rem; color: var(--text-gray); display: flex; gap: 10px; }
+        .provider-meta i { color: var(--secondary); }
+        .contact-btn { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .chat-list-item { background: var(--card-bg); margin: 1px 0; padding: 15px 20px; display: flex; align-items: center; gap: 15px; cursor: pointer; }
+        .chat-area { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; background: #f8fafc; }
+        .msg { max-width: 80%; padding: 10px 15px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; }
+        .msg.sent { align-self: flex-end; background: var(--primary); color: white; border-bottom-left-radius: 2px; }
+        .msg.received { align-self: flex-start; background: white; color: var(--text-dark); border: 1px solid #e2e8f0; border-bottom-right-radius: 2px; }
+
+        /* Forms & Utilities */
+        .form-container { padding: 20px; }
+        .input-group { margin-bottom: 15px; text-align: right; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--text-dark); font-size: 0.95rem; font-weight: 500;}
+        .input-group input, .input-group select { width: 100%; padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; outline: none; background: white; font-size: 1rem; color: var(--text-dark); transition: border 0.3s;}
+        .input-group input:focus { border-color: var(--primary); }
+        .location-input-wrapper { position: relative; cursor: pointer; }
+        .location-input-wrapper input { cursor: pointer; padding-left: 40px; }
+        .location-input-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--danger); font-size: 1.2rem; }
+
+        .submit-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 10px; font-weight: bold; font-size: 1.05rem; cursor: pointer; transition: background 0.3s; }
+        .outline-btn { width: 100%; background: transparent; color: var(--primary); border: 2px solid var(--primary); padding: 16px; border-radius: 10px; font-weight: bold; font-size: 1.05rem; cursor: pointer; }
+        
+        .otp-container { display: flex; justify-content: center; gap: 10px; margin: 25px 0; direction: ltr; }
+        .otp-input { width: 55px; height: 55px; border: 1px solid #cbd5e1; border-radius: 10px; text-align: center; font-size: 1.5rem; font-weight: bold; color: var(--primary); outline: none; transition: all 0.3s; background: white; }
+        .otp-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.1); }
+        .timer-text { text-align: center; color: var(--primary); font-size: 1.1rem; font-weight: bold; margin-bottom: 25px; }
+        
+        .bottom-nav { position: absolute; bottom: 0; width: 100%; background-color: var(--card-bg); border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; padding: 12px 0 20px; z-index: 20; border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #94a3b8; font-size: 0.8rem; font-weight: bold; gap: 5px; cursor: pointer; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 1.4rem; }
+
+        /* Custom Modal Styles */
+        #custom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content { background: white; width: 88%; max-width: 360px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-icon-container { width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 2.2rem; }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+
+        <!-- 1. شاشة البداية -->
+        <div id="screen-welcome" class="screen active" style="justify-content:center; padding:30px; text-align:center;">
+            <div style="position: relative; display: inline-block; margin-bottom: 20px;">
+                <i class="fas fa-shield-alt" style="font-size: 6rem; color: var(--primary);"></i>
+                <i class="fas fa-check" style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; color: var(--secondary);"></i>
+            </div>
+            <h1 style="color:var(--primary); font-size: 2.5rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 5px;">مُتْقَن</h1>
+            <p style="color: var(--text-gray); margin-bottom: 50px; font-size: 1rem;">عمل مُتقن.. وصيانة تدوم</p>
+            <button class="submit-btn" style="margin-bottom: 15px;" onclick="showScreen('screen-auth-login')">دخول كعميل</button>
+            <button class="outline-btn" onclick="showScreen('screen-worker-login')">دخول الفنيين المعتمدين</button>
+        </div>
+
+        <!-- 2. أ: تسجيل العميل -->
+        <div id="screen-auth-login" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-welcome')"><i class="fas fa-arrow-right"></i></button>
+                <h2>تسجيل الدخول / إنشاء حساب</h2>
+            </div>
+            <div class="form-container" style="margin-top: 10px;">
+                <div class="input-group">
+                    <label>الاسم الكامل</label>
+                    <input type="text" id="auth-name" placeholder="أدخل اسمك الكريم">
+                </div>
+                <div class="input-group">
+                    <label>رقم الجوال</label>
+                    <input type="tel" id="auth-phone" placeholder="05XXXXXXXX" maxlength="10" dir="ltr" style="text-align: right;" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+                </div>
+                <div class="input-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" id="auth-password" placeholder="أدخل كلمة المرور">
+                </div>
+                <button class="submit-btn" onclick="sendOTP()" style="margin-top: 15px;">متابعة</button>
+            </div>
+        </div>
+
+        <!-- 2. ب: شاشة التحقق (OTP) للعميل -->
+        <div id="screen-auth-otp" class="screen">
+            <div class="header">
+                <h2>رمز التحقق</h2>
+            </div>
+            <div class="form-container" style="text-align: center; margin-top: 20px;">
+                <p style="color: var(--text-gray); font-size: 1.05rem; margin-bottom: 10px;">يرجى إدخال الرمز المرسل إلى الجوال</p>
+                <div id="display-masked-phone" style="font-weight: bold; color: var(--text-dark); font-size: 1.1rem; direction: ltr;">966*******59</div>
+                
+                <div class="otp-container">
+                    <input type="tel" class="otp-input" maxlength="1" oninput="moveToNext(this, 1)" id="otp-1">
+                    <input type="tel" class="otp-input" maxlength="1" oninput="moveToNext(this, 2)" id="otp-2">
+                    <input type="tel" class="otp-input" maxlength="1" oninput="moveToNext(this, 3)" id="otp-3">
+                    <input type="tel" class="otp-input" maxlength="1" oninput="moveToNext(this, null)" id="otp-4">
+                </div>
+                
+                <div class="timer-text" id="otp-timer">01:59</div>
+                
+                <button class="submit-btn" style="background-color: #6366f1; border-radius: 12px; margin-bottom: 15px;" onclick="verifyOTP()">دخول</button>
+                <button class="outline-btn" style="border: none; color: var(--text-gray);" onclick="showScreen('screen-auth-login')">رجوع</button>
+            </div>
+        </div>
+
+        <!-- 3. تسجيل الفني (النظام الآمن بالشفرات الصعبة) -->
+        <div id="screen-worker-login" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-welcome')"><i class="fas fa-arrow-right"></i></button>
+                <h2>توثيق ودخول الفني</h2>
+            </div>
+            <div class="form-container" style="text-align: center; margin-top: 10px;">
+                <i class="fas fa-file-shield" style="font-size: 4rem; color: var(--primary); margin-bottom: 15px;"></i>
+                <h3 style="color: var(--primary); margin-bottom: 10px;">الاستمارة والشفرة السرية</h3>
+                <p style="color: var(--text-gray); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.6;">
+                    الرجاء إرفاق الاستمارة المعتمدة وإدخال شفرة التوثيق المطبوعة عليها.
+                </p>
+
+                <label for="form-upload" id="upload-area" style="display: block; border: 2px dashed #cbd5e1; padding: 25px 20px; border-radius: 15px; cursor: pointer; background: white; transition: all 0.3s; margin-bottom: 20px;">
+                    <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--secondary); margin-bottom: 10px;"></i>
+                    <div style="font-weight: bold; color: var(--text-dark); font-size: 1rem;" id="upload-text">اضغط هنا لإرفاق صورة الاستمارة</div>
+                </label>
+                <input type="file" id="form-upload" style="display: none;" accept=".pdf,image/*" onchange="document.getElementById('upload-text').innerText = 'تم إرفاق الملف بنجاح ✔'; document.getElementById('upload-text').style.color = 'var(--success)';">
+
+                <div class="input-group" style="text-align: right;">
+                    <label>شفرة التوثيق السرية</label>
+                    <input type="password" id="worker-secret-code" placeholder="أدخل الشفرة المعقدة" style="text-align: center; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">
+                </div>
+
+                <button class="submit-btn" onclick="verifyWorkerCodeStep()">تحقق من الشفرة</button>
+
+                <div id="scan-progress" style="display: none; margin-top: 20px; background: white; padding: 25px 20px; border-radius: 15px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+                    <i class="fas fa-search fa-spin" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 15px;"></i>
+                    <div style="color: var(--primary); font-weight: bold; margin-bottom: 15px;">جاري مطابقة الشفرة بالاستمارة...</div>
+                    <div style="width: 100%; background: #e2e8f0; border-radius: 10px; height: 8px; overflow: hidden;">
+                        <div id="scan-bar" style="width: 0%; height: 100%; background: var(--success); transition: width 2s ease-in-out;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. رئيسية العميل -->
+        <div id="screen-customer-home" class="screen">
+            <div class="home-top-bar">
+                <button class="notification-btn" onclick="showScreen('screen-notifications')">
+                    <i class="fas fa-bell"></i><div class="badge" id="notif-badge"></div>
+                </button>
+                <div class="location-info">
+                    <span>موقعك الحالي</span>
+                    <strong><i class="fas fa-map-marker-alt"></i> <span id="display-location">جاري التحديد...</span></strong>
+                </div>
+            </div>
+
+            <div style="padding: 20px 20px 10px; font-size: 1.3rem; color: var(--primary); font-weight: bold;">
+                مرحباً بك، <span id="home-greeting-name"></span> 👋
+            </div>
+
+            <div style="background: var(--primary); margin: 0 20px 20px; padding: 18px 20px; border-radius: 16px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; overflow: hidden;">
+                <i class="fas fa-shield-alt" style="position: absolute; right: -10px; opacity: 0.05; font-size: 5rem;"></i>
+                <div style="display: flex; align-items: center; gap: 10px; z-index: 1;">
+                    <i class="fas fa-medal" style="color: var(--secondary); font-size: 1.4rem;"></i>
+                    <span style="font-weight: bold; font-size: 1.1rem;">عقود الصيانة الدورية</span>
+                </div>
+                <button onclick="showScreen('screen-subscriptions')" style="background: var(--secondary); color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: bold; font-size: 0.9rem; cursor: pointer; z-index: 1;">الاشتراكات</button>
+            </div>
+
+            <div onclick="initiateEmergency()" style="background: linear-gradient(135deg, #ef4444, #dc2626); margin: 0 20px 20px; padding: 20px; border-radius: 15px; color: white; display: flex; align-items: center; gap: 15px; cursor: pointer; box-shadow: 0 8px 15px -3px rgba(239,68,68,0.3);">
+                <div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.5rem;"><i class="fas fa-truck-fast"></i></div>
+                <div>
+                    <h3 style="margin-bottom:5px; font-size:1.1rem;">طلب طوارئ 24/7</h3>
+                    <p style="font-size:0.85rem; opacity:0.9;">استجابة فورية للأعطال الحرجة</p>
+                </div>
+            </div>
+
+            <div style="padding: 0 20px 15px; color: var(--primary); font-weight: bold;">الخدمات المتاحة</div>
+            <div class="services-grid">
+                <div class="service-card" onclick="openServiceCategory('سباكة')"><div class="service-icon icon-plumbing"><i class="fas fa-wrench"></i></div><h4>سباكة</h4></div>
+                <div class="service-card" onclick="openServiceCategory('كهرباء')"><div class="service-icon icon-electric"><i class="fas fa-bolt"></i></div><h4>كهرباء</h4></div>
+                <div class="service-card" onclick="openServiceCategory('تكييف وتبريد')"><div class="service-icon icon-ac"><i class="fas fa-snowflake"></i></div><h4>تكييف وتبريد</h4></div>
+                <div class="service-card" onclick="openServiceCategory('صيانة سيارات')"><div class="service-icon icon-car"><i class="fas fa-car"></i></div><h4>صيانة سيارات</h4></div>
+                <div class="service-card" onclick="openServiceCategory('دهانات')"><div class="service-icon icon-paint"><i class="fas fa-paint-roller"></i></div><h4>دهانات</h4></div>
+                <div class="service-card" onclick="openServiceCategory('نجارة')"><div class="service-icon icon-wood"><i class="fas fa-hammer"></i></div><h4>نجارة</h4></div>
+            </div>
+        </div>
+
+        <!-- 5. شاشة الاشتراكات والباقات -->
+        <div id="screen-subscriptions" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-customer-home')"><i class="fas fa-arrow-right"></i></button>
+                <h2>الاشتراكات</h2>
+            </div>
+            <div style="padding: 20px;">
+                <div style="background: white; padding: 25px 20px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0; text-align: center;">
+                    <h3 style="color: var(--text-dark); margin-bottom: 10px;">الباقة الشهرية</h3>
+                    <div style="font-size: 2.2rem; color: var(--primary); font-weight: bold; margin-bottom: 15px;">199 <span style="font-size: 1rem; color: var(--text-gray);">ريال/شهر</span></div>
+                    <ul style="list-style: none; text-align: right; margin-bottom: 20px; font-size: 0.95rem; color: var(--text-dark); line-height: 1.8;">
+                        <li><i class="fas fa-check-circle" style="color: var(--success); margin-left: 8px;"></i>زيارة واحدة مجدولة شهرياً</li>
+                        <li><i class="fas fa-check-circle" style="color: var(--success); margin-left: 8px;"></i>فحص شامل للكهرباء والسباكة</li>
+                    </ul>
+                    <button class="submit-btn" style="background: white; color: var(--primary); border: 2px solid var(--primary);" onclick="subscribePlan('شهرية', 30)">اشترك الآن</button>
+                </div>
+
+                <div style="background: white; padding: 25px 20px; border-radius: 16px; margin-bottom: 20px; border: 2px solid var(--secondary); text-align: center; position: relative;">
+                    <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: var(--secondary); color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">الأكثر توفيراً</div>
+                    <h3 style="color: var(--text-dark); margin-bottom: 10px; margin-top: 10px;">الباقة السنوية</h3>
+                    <div style="font-size: 2.2rem; color: var(--primary); font-weight: bold; margin-bottom: 15px;">1999 <span style="font-size: 1rem; color: var(--text-gray);">ريال/سنوياً</span></div>
+                    <ul style="list-style: none; text-align: right; margin-bottom: 20px; font-size: 0.95rem; color: var(--text-dark); line-height: 1.8;">
+                        <li><i class="fas fa-check-circle" style="color: var(--success); margin-left: 8px;"></i>12 زيارة مجدولة</li>
+                        <li><i class="fas fa-check-circle" style="color: var(--success); margin-left: 8px;"></i>تنظيف مكيفات مجاني مرتين</li>
+                        <li><i class="fas fa-check-circle" style="color: var(--success); margin-left: 8px;"></i>أولوية قصوى للطوارئ</li>
+                    </ul>
+                    <button class="submit-btn" style="background: var(--secondary);" onclick="subscribePlan('سنوية', 365)">اشترك الآن</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. قائمة مزودي الخدمة -->
+        <div id="screen-providers-list" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-customer-home')"><i class="fas fa-arrow-right"></i></button>
+                <h2 id="category-title">مزودي الخدمة</h2>
+            </div>
+            <div id="providers-container"></div>
+        </div>
+
+        <!-- 7. شاشة المحادثة المباشرة -->
+        <div id="screen-chat" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="goBackFromChat()"><i class="fas fa-arrow-right"></i></button>
+                <h2 id="chat-title">المحادثة</h2>
+            </div>
+            <div class="chat-area" id="chat-messages"></div>
+            <div style="background:white; padding:15px; display:flex; gap:10px; position:sticky; bottom:0; border-top: 1px solid #e2e8f0;">
+                <input type="text" id="chat-input" placeholder="اكتب رسالة..." style="flex:1; padding:12px 20px; border:1px solid #e2e8f0; border-radius:25px; outline:none; background:#f8fafc;" onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" style="background:var(--primary); color:white; border:none; width:45px; height:45px; border-radius:50%; cursor:pointer;"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+        
+        <div id="screen-chat-list" class="screen">
+            <div class="header"><h2>المحادثات</h2></div>
+            <div id="chats-container" style="margin-top: 10px;"></div>
+        </div>
+
+        <!-- 8. رئيسية الفني -->
+        <div id="screen-worker-home" class="screen">
+            <div class="header"><h2>لوحة التحكم</h2></div>
+            <div style="background:white; margin:15px; padding:20px; border-radius:12px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div class="provider-img"><i class="fas fa-shield-alt"></i></div>
+                    <div>
+                        <h3 id="w-display-name" style="color: var(--text-dark);">اسم الفني</h3>
+                        <p id="w-display-job" style="color: var(--text-gray); font-size: 0.9rem;">التخصص</p>
+                    </div>
+                </div>
+                <div style="color:var(--success); font-weight: bold;"><i class="fas fa-circle" style="font-size: 0.6rem;"></i> متصل ومستعد لاستقبال الطلبات</div>
+            </div>
+            <div style="padding: 0 20px 10px; font-weight: bold; color: var(--text-dark);">الطلبات الواردة</div>
+            <div id="incoming-requests">
+                <p style="text-align:center; color:#6b7280; margin-top:20px;">لا توجد طلبات جديدة حالياً.</p>
+            </div>
+        </div>
+
+        <!-- لوحة تحكم الإدارة -->
+        <div id="screen-admin-dashboard" class="screen">
+            <div class="header">
+                <h2>لوحة تحكم الإدارة</h2>
+            </div>
+            <div style="padding: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <h3 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;"><i class="fas fa-users" style="margin-left:8px;"></i>العملاء المسجلين</h3>
+                    <div id="admin-customers-list"></div>
+                </div>
+                
+                <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <h3 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;"><i class="fas fa-tools" style="margin-left:8px;"></i>الفنيين المعتمدين</h3>
+                    <div id="admin-workers-list"></div>
+                </div>
+                <button class="outline-btn" style="color: var(--danger); border-color: var(--danger); background: #fef2f2;" onclick="logout()">تسجيل الخروج</button>
+            </div>
+        </div>
+
+        <!-- 9. التنبيهات -->
+        <div id="screen-notifications" class="screen">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-customer-home')"><i class="fas fa-arrow-right"></i></button>
+                <h2>التنبيهات</h2>
+            </div>
+            <div id="notif-container">
+                <div class="notification-item">مرحباً بك في منصة مُتْقَن! يمكنك الآن تصفح الخدمات وطلب الفنيين المعتمدين.</div>
+            </div>
+        </div>
+
+        <!-- 10. الحساب -->
+        <div id="screen-customer-profile" class="screen">
+            <div class="header"><h2>حسابي</h2></div>
+            <div style="padding: 20px; margin-top: 10px;">
+                <div style="background: white; padding: 25px 20px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h3 style="color: var(--primary); font-size: 1.1rem; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">المعلومات الشخصية</h3>
+                    <div class="input-group">
+                        <label>الاسم الكامل</label>
+                        <input type="text" id="profile-name">
+                    </div>
+                    <div class="input-group">
+                        <label>المدينة / الموقع</label>
+                        <div class="location-input-wrapper" onclick="openMap()">
+                            <input type="text" id="profile-city" readonly placeholder="اضغط لتحديد موقعك">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>رقم الجوال</label>
+                        <input type="tel" id="profile-phone" dir="ltr" style="text-align: right;" maxlength="10">
+                    </div>
+                    <button class="submit-btn" onclick="saveProfile(this)" style="margin-top: 10px; background-color: #1e3a8a;">حفظ التعديلات</button>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 16px; margin-bottom: 25px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="color: var(--text-gray); font-size: 0.85rem; margin-bottom: 5px;">حالة عقد الصيانة</div>
+                        <div id="sub-status" style="font-weight: bold; color: var(--text-dark);">لا يوجد اشتراك نشط</div>
+                        <div id="sub-days" style="color: var(--text-gray); font-size: 0.8rem; margin-top: 4px; display: none;"></div>
+                    </div>
+                    <i class="fas fa-file-contract" style="font-size: 2rem; color: #cbd5e1;"></i>
+                </div>
+
+                <button class="outline-btn" style="color: var(--danger); border-color: var(--danger); background: #fef2f2;" onclick="logout()">تسجيل الخروج</button>
+            </div>
+        </div>
+
+        <!-- 11. شاشة الخريطة -->
+        <div id="screen-map-picker" class="screen" style="padding-bottom: 0; background: white;">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-customer-profile')"><i class="fas fa-arrow-right"></i></button>
+                <h2>تحديد الموقع</h2>
+            </div>
+            <div style="flex:1; width:100%; position:relative;">
+                <div id="map" style="width:100%; height:100%;"></div>
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -100%); z-index:1000; pointer-events:none;">
+                    <i class="fas fa-map-marker-alt" style="color:var(--danger); font-size:3.5rem; text-shadow: 0 3px 6px rgba(0,0,0,0.3);"></i>
+                </div>
+            </div>
+            <div style="padding: 20px; background:white; box-shadow:0 -5px 15px rgba(0,0,0,0.1); z-index:1001;">
+                <p style="text-align: center; color: var(--text-gray); font-size: 0.9rem; margin-bottom: 15px;">حرك الخريطة لوضع المؤشر على موقعك بدقة</p>
+                <button id="confirm-map-btn" class="submit-btn" style="background-color: #1e3a8a;" onclick="confirmLocation()">تأكيد الموقع الحالي</button>
+            </div>
+        </div>
+
+        <!-- Navigation Bottom -->
+        <div id="nav-customer" class="bottom-nav" style="display: none;">
+            <div class="nav-item" onclick="showScreen('screen-customer-profile')" id="tab-profile"><i class="fas fa-user"></i>الحساب</div>
+            <div class="nav-item" onclick="showScreen('screen-chat-list')" id="tab-chats"><i class="fas fa-comments"></i>المحادثات</div>
+            <div class="nav-item active" onclick="showScreen('screen-customer-home')" id="tab-home"><i class="fas fa-home"></i>الرئيسية</div>
+        </div>
+        <div id="nav-worker" class="bottom-nav" style="display: none;">
+            <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>خروج</div>
+            <div class="nav-item" onclick="showScreen('screen-chat-list')" id="w-tab-chats"><i class="fas fa-comments"></i>المحادثات</div>
+            <div class="nav-item active" onclick="showScreen('screen-worker-home')" id="w-tab-home"><i class="fas fa-list"></i>الطلبات</div>
+        </div>
+
+        <!-- النظام الخاص بالنوافذ المنبثقة -->
+        <div id="custom-modal">
+            <div class="modal-content">
+                <div class="modal-icon-container" id="modal-icon-bg"><i id="modal-icon" class=""></i></div>
+                <h3 id="modal-title" style="color:var(--text-dark); margin-bottom:10px; font-size: 1.2rem;"></h3>
+                <div id="modal-desc" style="color:var(--text-gray); font-size:0.95rem; margin-bottom:25px; line-height:1.6;"></div>
+                <div id="modal-actions" style="display:flex; flex-direction: column; gap:10px; justify-content:center;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const channel = new BroadcastChannel('mutqan_app_v15');
+        let currentUser = null; 
+        let activeChatId = null;
+        let myMap = null;
+        let otpTimerInterval;
+        let tempAuthData = {}; 
+        let pendingWorkerJob = ''; 
+
+        if(!localStorage.getItem('mutqan_db_v15')) localStorage.setItem('mutqan_db_v15', JSON.stringify([]));
+        if(!localStorage.getItem('mutqan_customers_db')) localStorage.setItem('mutqan_customers_db', JSON.stringify([]));
+        if(!localStorage.getItem('mutqan_chats_v15')) localStorage.setItem('mutqan_chats_v15', JSON.stringify({}));
+
+        function getDB(key) { return JSON.parse(localStorage.getItem(key)) || (key.includes('chats') ? {} : []); }
+        function saveDB(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+        function showCustomModal(title, desc, iconClass, iconColor, bgColor, buttons) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerHTML = desc.replace(/\n/g, '<br>');
+            document.getElementById('modal-icon').className = iconClass;
+            document.getElementById('modal-icon').style.color = iconColor;
+            document.getElementById('modal-icon-bg').style.backgroundColor = bgColor;
+            
+            const actionsDiv = document.getElementById('modal-actions');
+            actionsDiv.innerHTML = '';
+            buttons.forEach(btn => {
+                const b = document.createElement('button');
+                b.innerText = btn.text;
+                b.className = btn.type === 'primary' ? 'submit-btn' : 'outline-btn';
+                if(btn.type === 'danger') { b.className = 'submit-btn'; b.style.backgroundColor = 'var(--danger)'; }
+                b.onclick = () => {
+                    document.getElementById('custom-modal').style.display = 'none';
+                    if(btn.onClick) btn.onClick();
+                };
+                actionsDiv.appendChild(b);
+            });
+            document.getElementById('custom-modal').style.display = 'flex';
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+
+            document.getElementById('nav-customer').style.display = 'none';
+            document.getElementById('nav-worker').style.display = 'none';
+
+            if(currentUser) {
+                if(currentUser.role === 'customer') {
+                    if(['screen-customer-home', 'screen-customer-profile', 'screen-chat-list', 'screen-subscriptions'].includes(id)) {
+                        document.getElementById('nav-customer').style.display = 'flex';
+                        document.querySelectorAll('#nav-customer .nav-item').forEach(i => i.classList.remove('active'));
+                        if(id === 'screen-customer-profile') document.getElementById('tab-profile').classList.add('active');
+                        else if(id === 'screen-chat-list') { document.getElementById('tab-chats').classList.add('active'); loadChatList(); }
+                        else document.getElementById('tab-home').classList.add('active');
+                    }
+                } else if(currentUser.role === 'worker') {
+                    if(['screen-worker-home', 'screen-chat-list'].includes(id)) {
+                        document.getElementById('nav-worker').style.display = 'flex';
+                        document.querySelectorAll('#nav-worker .nav-item').forEach(i => i.classList.remove('active'));
+                        if(id === 'screen-chat-list') { document.getElementById('w-tab-chats').classList.add('active'); loadChatList(); }
+                        else document.getElementById('w-tab-home').classList.add('active');
+                    }
+                }
+            }
+        }
+
+        // ---------- تسجيل دخول العميل ----------
+        function sendOTP() {
+            const name = document.getElementById('auth-name').value.trim();
+            const phone = document.getElementById('auth-phone').value;
+            const password = document.getElementById('auth-password').value;
+
+            if(!name || phone.length < 9 || !password) {
+                showCustomModal("بيانات ناقصة", "الرجاء تعبئة جميع الحقول بشكل صحيح قبل المتابعة.", "fas fa-exclamation-circle", "var(--danger)", "#fee2e2", [{text: "حسناً", type: "primary"}]);
+                return;
+            }
+            
+            tempAuthData = { name: name, phone: phone };
+            const maskedPhone = "966*******" + phone.slice(-2);
+            document.getElementById('display-masked-phone').innerText = maskedPhone;
+            document.querySelectorAll('.otp-input').forEach(i => i.value = '');
+            
+            showScreen('screen-auth-otp');
+            startOTPTimer();
+            setTimeout(() => document.getElementById('otp-1').focus(), 300);
+        }
+
+        function moveToNext(currentInput, nextId) {
+            currentInput.value = currentInput.value.replace(/[^0-9]/g, '');
+            if(currentInput.value.length === 1 && nextId) { document.getElementById('otp-' + nextId).focus(); }
+        }
+
+        function startOTPTimer() {
+            clearInterval(otpTimerInterval);
+            let timeLeft = 119; 
+            const timerDisplay = document.getElementById('otp-timer');
+            
+            otpTimerInterval = setInterval(() => {
+                let m = Math.floor(timeLeft / 60);
+                let s = timeLeft % 60;
+                timerDisplay.innerText = `0${m}:${s < 10 ? '0'+s : s}`;
+                if(timeLeft <= 0) {
+                    clearInterval(otpTimerInterval);
+                    timerDisplay.innerText = "انتهى الوقت";
+                }
+                timeLeft--;
+            }, 1000);
+        }
+
+        function verifyOTP() {
+            const code = document.getElementById('otp-1').value + document.getElementById('otp-2').value + document.getElementById('otp-3').value + document.getElementById('otp-4').value;
+            if(code.length < 4) {
+                showCustomModal("تنبيه", "الرجاء إدخال الرمز كاملاً.", "fas fa-times-circle", "var(--danger)", "#fee2e2", [{text: "حسناً", type: "primary"}]);
+                return;
+            }
+            
+            clearInterval(otpTimerInterval);
+            currentUser = { id: 'cust_' + Date.now(), role: 'customer', name: tempAuthData.name, city: 'جاري التحديد...', phone: tempAuthData.phone };
+            
+            const customers = getDB('mutqan_customers_db');
+            customers.push(currentUser);
+            saveDB('mutqan_customers_db', customers);
+
+            document.getElementById('display-location').innerText = currentUser.city;
+            document.getElementById('profile-name').value = currentUser.name;
+            document.getElementById('home-greeting-name').innerText = currentUser.name;
+            document.getElementById('profile-city').value = currentUser.city;
+            document.getElementById('profile-phone').value = currentUser.phone;
+            
+            showScreen('screen-customer-home');
+        }
+
+        // ---------- التحقق من الشفرات الصعبة والسرية (تشمل الكهرباء، السباكة، النجارة، التكييف، صيانة السيارات، الدهانات، والإدارة) ----------
+        function verifyWorkerCodeStep() {
+            const fileInput = document.getElementById('form-upload');
+            const codeInput = document.getElementById('worker-secret-code').value.trim();
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showCustomModal("تنبيه", "الرجاء إرفاق صورة الاستمارة المعتمدة أولاً.", "fas fa-cloud-upload-alt", "var(--danger)", "#fee2e2", [{text: "حسناً", type: "primary"}]);
+                return;
+            }
+
+            if (!codeInput) {
+                showCustomModal("تنبيه", "الرجاء إدخال شفرة التوثيق السرية.", "fas fa-keyboard", "var(--danger)", "#fee2e2", [{text: "حسناً", type: "primary"}]);
+                return;
+            }
+
+            // شفرة الإدارة الخاصة بك
+            if (codeInput === 'ADM-9999-SECURE') {
+                processAdminLogin(fileInput);
+                return;
+            }
+
+            // الشفرات الصعبة والمعقدة لجميع الأقسام
+            const secureCodesMap = {
+                'EL-X8Q2-9P4W': 'كهرباء',
+                'PL-M3K7-2V9Z': 'سباكة',
+                'WD-L5H9-4R8Y': 'نجارة',
+                'AC-R4N6-1T3B': 'تكييف وتبريد',
+                'CR-V8N3-5W2X': 'صيانة سيارات',  // <-- جديدة
+                'PT-K9F4-7H1L': 'دهانات'         // <-- جديدة
+            };
+
+            const assignedJob = secureCodesMap[codeInput];
+
+            if (!assignedJob) {
+                showCustomModal("شفرة غير صالحة", "الشفرة سرية أو غير صحيحة، يرجى التأكد من الشفرة المطبوعة على استمارتك.", "fas fa-times-circle", "var(--danger)", "#fee2e2", [{text: "إعادة المحاولة", type: "primary"}]);
+                return;
+            }
+
+            // إذا الشفرة صحيحة، نطلب منه كتابة اسم مؤسسته الخاصة
+            fileInput.value = '';
+            document.getElementById('worker-secret-code').value = '';
+            document.getElementById('upload-text').innerText = 'اضغط هنا لإرفاق صورة الاستمارة';
+            document.getElementById('upload-text').style.color = 'var(--text-dark)';
+
+            pendingWorkerJob = assignedJob;
+            promptForCompanyName(assignedJob);
+        }
+
+        function promptForCompanyName(job) {
+            const htmlInput = `
+                <p style="font-size:0.9rem; color:var(--text-gray); margin-bottom:10px;">تم التحقق من الشفرة بنجاح لتخصص (<strong>${job}</strong>).\nالرجاء إدخال اسم مؤسستك أو محلك التجاري:</p>
+                <input type="text" id="custom-biz-name" placeholder="مثال: ورشة الأمانة للسيارات" style="width:100%; padding:14px; border:1px solid #cbd5e1; border-radius:10px; font-family:inherit; font-size:1rem; outline:none; text-align:right;">
+            `;
+            showCustomModal("تسمية المنشأة", htmlInput, "fas fa-building", "var(--primary)", "#e0e7ff", [
+                { text: "إتمام التسجيل والدخول", type: "primary", onClick: () => {
+                    const bizName = document.getElementById('custom-biz-name').value.trim();
+                    if(!bizName) {
+                        alert("الرجاء إدخال اسم المؤسسة");
+                        return;
+                    }
+                    registerValidatedWorker(bizName, job);
+                }}
+            ]);
+        }
+
+        function registerValidatedWorker(name, job) {
+            const newWorker = { id: 'w_' + Date.now(), name: name, job: job, rating: '5.0', desc: 'موثق عبر الاستمارة والشفرة السرية' };
+            const workers = getDB('mutqan_db_v15');
+            workers.push(newWorker);
+            saveDB('mutqan_db_v15', workers);
+
+            currentUser = { role: 'worker', ...newWorker };
+            document.getElementById('w-display-name').innerText = currentUser.name;
+            document.getElementById('w-display-job').innerText = currentUser.job;
+            
+            showCustomModal("مرحباً بك!", `تم تسجيل مؤسستك بنجاح.\n\nالاسم: ${name}\nالتخصص: ${job}`, "fas fa-check-circle", "var(--success)", "#d1fae5", [
+                { text: "الدخول للوحة التحكم", type: "primary", onClick: () => showScreen('screen-worker-home') }
+            ]);
+        }
+
+        function processAdminLogin(fileInput) {
+            document.getElementById('upload-area').style.display = 'none';
+            document.getElementById('scan-progress').style.display = 'block';
+            setTimeout(() => { document.getElementById('scan-bar').style.width = '100%'; }, 100);
+
+            setTimeout(() => {
+                fileInput.value = ''; 
+                document.getElementById('worker-secret-code').value = '';
+                document.getElementById('upload-text').innerText = 'اضغط هنا لإرفاق صورة الاستمارة';
+                document.getElementById('upload-area').style.display = 'block';
+                document.getElementById('scan-progress').style.display = 'none';
+                document.getElementById('scan-bar').style.width = '0%';
+
+                currentUser = { role: 'admin', name: 'إدارة النظام' };
+                loadAdminDashboard();
+                
+                showCustomModal("صلاحيات المدير", "أهلاً بك في لوحة تحكم تطبيق مُتْقَن الإدارية.", "fas fa-user-shield", "var(--primary)", "#e0e7ff", [
+                    { text: "فتح لوحة التحكم", type: "primary", onClick: () => showScreen('screen-admin-dashboard') }
+                ]);
+            }, 2000);
+        }
+
+        function loadAdminDashboard() {
+            const customers = getDB('mutqan_customers_db');
+            const workers = getDB('mutqan_db_v15');
+            
+            let cHTML = '';
+            if(customers.length === 0) cHTML = '<p style="color:var(--text-gray); font-size:0.9rem; text-align:center; padding:10px;">لا يوجد عملاء مسجلين حتى الآن.</p>';
+            customers.forEach(c => {
+                cHTML += `<div style="padding:12px 10px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:bold; color:var(--text-dark);">${c.name}</div>
+                    <div style="color:var(--text-gray); font-size:0.85rem;" dir="ltr">${c.phone}</div>
+                </div>`;
+            });
+            document.getElementById('admin-customers-list').innerHTML = cHTML;
+
+            let wHTML = '';
+            if(workers.length === 0) wHTML = '<p style="color:var(--text-gray); font-size:0.9rem; text-align:center; padding:10px;">لا يوجد فنيين مسجلين حتى الآن.</p>';
+            workers.forEach(w => {
+                wHTML += `<div style="padding:12px 10px; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-weight:bold; color:var(--text-dark);">${w.name}</div>
+                    <div style="background:var(--secondary); color:white; font-size:0.75rem; padding:3px 8px; border-radius:10px;">${w.job}</div>
+                </div>`;
+            });
+            document.getElementById('admin-workers-list').innerHTML = wHTML;
+        }
+
+        // ---------- الطوارئ والخدمات ----------
+        function initiateEmergency() {
+            showCustomModal("تنبيه الطوارئ", "خدمة الطوارئ توفر استجابة فورية، يرجى العلم أن التكلفة يتم تحديدها من قبل الفني بعد المعاينة.", "fas fa-exclamation-triangle", "var(--danger)", "#fee2e2", [
+                { text: "موافق، اختر نوع العطل", type: "danger", onClick: () => showEmergencyPicker() },
+                { text: "إلغاء", type: "secondary" }
+            ]);
+        }
+
+        function showEmergencyPicker() {
+            const htmlSelect = `
+                <select id="em-job" style="width:100%; padding:14px; border:1px solid #cbd5e1; border-radius:10px; margin-top:10px; font-family:inherit; font-size:1rem; outline:none;">
+                    <option value="سباكة">سباكة</option>
+                    <option value="كهرباء">كهرباء</option>
+                    <option value="تكييف وتبريد">تكييف وتبريد</option>
+                    <option value="صيانة سيارات">صيانة سيارات</option>
+                    <option value="دهانات">دهانات</option>
+                    <option value="نجارة">نجارة</option>
+                </select>
+            `;
+            showCustomModal("ما هو نوع العطل؟", htmlSelect, "fas fa-tools", "var(--primary)", "#e0e7ff", [
+                { text: "البحث عن أقرب فني", type: "primary", onClick: () => {
+                    const job = document.getElementById('em-job').value;
+                    findEmergencyWorker(job);
+                }}
+            ]);
+        }
+
+        function findEmergencyWorker(job) {
+            const workers = getDB('mutqan_db_v15').filter(w => w.job === job);
+            if(workers.length > 0) {
+                startChat(workers[0].id, workers[0].name);
+            } else {
+                showCustomModal("نعتذر منك", `لا يوجد فني متاح في تخصص "${job}" لخدمة الطوارئ حالياً، جرب لاحقاً.`, "fas fa-user-slash", "var(--text-gray)", "#f1f5f9", [
+                    { text: "حسناً", type: "primary" }
+                ]);
+            }
+        }
+
+        function openServiceCategory(job) {
+            document.getElementById('category-title').innerText = job;
+            const workers = getDB('mutqan_db_v15').filter(w => w.job === job);
+            const container = document.getElementById('providers-container');
+            container.innerHTML = '';
+
+            if(workers.length === 0) {
+                container.innerHTML = `
+                    <div style="background: white; border-radius: 12px; padding: 40px 20px; text-align: center; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <i class="fas fa-user-slash" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 15px;"></i>
+                        <h3 style="color: var(--text-dark); font-size: 1.1rem;">لا يوجد فنيين حالياً</h3>
+                    </div>`;
+            } else {
+                workers.forEach(w => {
+                    container.innerHTML += `
+                        <div class="provider-card">
+                            <div class="provider-img"><i class="fas fa-shield-alt"></i></div>
+                            <div class="provider-info">
+                                <div class="provider-name">${w.name}</div>
+                                <div class="provider-meta"><span><i class="fas fa-star"></i> ${w.rating}</span></div>
+                                <div style="font-size:0.8rem; color:var(--text-gray); margin-top:5px;">${w.desc}</div>
+                            </div>
+                            <button class="contact-btn" onclick="startChat('${w.id}', '${w.name}')">تواصل</button>
+                        </div>
+                    `;
+                });
+            }
+            showScreen('screen-providers-list');
+        }
+
+        function startChat(targetId, targetName) {
+            activeChatId = currentUser.role === 'customer' ? `${currentUser.id}_${targetId}` : `${targetId}_${currentUser.id}`;
+            document.getElementById('chat-title').innerText = targetName;
+            
+            let chats = getDB('mutqan_chats_v15');
+            if(!chats[activeChatId]) {
+                chats[activeChatId] = {
+                    customerId: currentUser.role === 'customer' ? currentUser.id : targetId,
+                    customerName: currentUser.role === 'customer' ? currentUser.name : targetName,
+                    workerId: currentUser.role === 'worker' ? currentUser.id : targetId,
+                    workerName: currentUser.role === 'worker' ? currentUser.name : targetName,
+                    messages: []
+                };
+                saveDB('mutqan_chats_v15', chats);
+                channel.postMessage({ type: 'NEW_CHAT', chatId: activeChatId, targetId: targetId, customerName: currentUser.name });
+            }
+            renderMessages();
+            showScreen('screen-chat');
+        }
+
+        function renderMessages() {
+            const chats = getDB('mutqan_chats_v15');
+            const chatBox = document.getElementById('chat-messages');
+            chatBox.innerHTML = '';
+            
+            if(chats[activeChatId] && chats[activeChatId].messages) {
+                chats[activeChatId].messages.forEach(m => {
+                    const isMine = m.senderId === currentUser.id;
+                    chatBox.innerHTML += `<div class="msg ${isMine ? 'sent' : 'received'}">${m.text}</div>`;
+                });
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text && activeChatId) {
+                const chats = getDB('mutqan_chats_v15');
+                const msgObj = { senderId: currentUser.id, text: text, time: Date.now() };
+                chats[activeChatId].messages.push(msgObj);
+                saveDB('mutqan_chats_v15', chats);
+                
+                input.value = '';
+                renderMessages();
+                channel.postMessage({ type: 'MSG_UPDATE', chatId: activeChatId });
+            }
+        }
+
+        function goBackFromChat() {
+            if(currentUser.role === 'customer') showScreen('screen-chat-list');
+            else showScreen('screen-chat-list');
+        }
+
+        function subscribePlan(type, days) {
+            document.getElementById('sub-status').innerText = `باقة ${type} - نشط`;
+            document.getElementById('sub-status').style.color = "var(--success)";
+            
+            const daysElem = document.getElementById('sub-days');
+            daysElem.innerText = `متبقي ${days} يوم`;
+            daysElem.style.display = 'block';
+
+            showCustomModal("تهانينا!", `تم تفعيل الباقة ال${type} بنجاح!\nشكراً لثقتك بمنصة مُتْقَن.`, "fas fa-medal", "var(--secondary)", "#fef3c7", [
+                { text: "العودة للرئيسية", type: "primary", onClick: () => showScreen('screen-customer-home') }
+            ]);
+        }
+
+        function saveProfile(btnElement) {
+            currentUser.name = document.getElementById('profile-name').value;
+            currentUser.city = document.getElementById('profile-city').value;
+            currentUser.phone = document.getElementById('profile-phone').value;
+            
+            document.getElementById('display-location').innerText = currentUser.city;
+            document.getElementById('home-greeting-name').innerText = currentUser.name;
+
+            const originalText = btnElement.innerText;
+            btnElement.innerText = 'تم الحفظ بنجاح ✔';
+            btnElement.style.backgroundColor = 'var(--success)';
+            
+            setTimeout(() => {
+                btnElement.innerText = originalText;
+                btnElement.style.backgroundColor = '#1e3a8a';
+            }, 2000);
+        }
+
+        function logout() { currentUser = null; tempAuthData = {}; showScreen('screen-welcome'); }
+
+        function openMap() {
+            showScreen('screen-map-picker');
+            if(!myMap) {
+                myMap = L.map('map').setView([16.8894, 42.5511], 13);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap contributors' }).addTo(myMap);
+            }
+            setTimeout(() => { 
+                myMap.invalidateSize(); 
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        myMap.setView([position.coords.latitude, position.coords.longitude], 16);
+                    }, () => {});
+                }
+            }, 300);
+        }
+
+        async function confirmLocation() {
+            const btn = document.getElementById('confirm-map-btn');
+            btn.innerText = 'جاري تحديد العنوان...';
+            const center = myMap.getCenter();
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${center.lat}&lon=${center.lng}&accept-language=ar`);
+                const data = await res.json();
+                document.getElementById('profile-city').value = data.address.city || data.address.town || data.address.state || 'موقع محدد عبر الخريطة';
+            } catch(e) {
+                document.getElementById('profile-city').value = `موقع محدد`;
+            }
+            btn.innerText = 'تأكيد الموقع الحالي';
+            showScreen('screen-customer-profile');
+        }
+
+        function loadChatList() {
+            const chats = getDB('mutqan_chats_v15');
+            const container = document.getElementById('chats-container');
+            container.innerHTML = '';
+            let hasChats = false;
+
+            Object.keys(chats).forEach(chatId => {
+                const chat = chats[chatId];
+                if(chat.customerId === currentUser.id || chat.workerId === currentUser.id) {
+                    hasChats = true;
+                    const otherName = currentUser.role === 'customer' ? chat.workerName : chat.customerName;
+                    const otherId = currentUser.role === 'customer' ? chat.workerId : chat.customerId;
+                    const lastMsg = chat.messages.length > 0 ? chat.messages[chat.messages.length-1].text : 'تم بدء المحادثة';
+                    
+                    container.innerHTML += `
+                        <div class="chat-list-item" onclick="startChat('${otherId}', '${otherName}')">
+                            <div class="provider-img" style="width:50px; height:50px; border-radius:50%;"><i class="fas fa-user" style="color:white;"></i></div>
+                            <div style="flex:1; overflow:hidden;">
+                                <div style="font-weight:bold; color:var(--text-dark);">${otherName}</div>
+                                <div style="font-size:0.85rem; color:var(--text-gray); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${lastMsg}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            if(!hasChats) container.innerHTML = '<p style="text-align: center; color: var(--text-gray); margin-top: 40px;"><i class="fas fa-comment-slash" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 10px; display:block;"></i>لا توجد محادثات.</p>';
+        }
+
+        channel.onmessage = (event) => {
+            const data = event.data;
+            if(!currentUser) return;
+            if (data.type === 'MSG_UPDATE' && activeChatId === data.chatId) {
+                renderMessages();
+            } else if (data.type === 'MSG_UPDATE' || data.type === 'NEW_CHAT') {
+                if(currentUser.role === 'worker' && data.targetId === currentUser.id) {
+                    document.getElementById('incoming-requests').innerHTML = `
+                        <div class="provider-card" style="background:#fef3c7; border-right: 4px solid var(--secondary); cursor:pointer;" onclick="showScreen('screen-chat-list')">
+                            <div class="provider-info"><div style="font-weight:bold; color:var(--primary);">رسالة جديدة من العميل!</div></div>
+                        </div>
+                    `;
+                }
+            }
+        };
+    </script>
+</body>
+</html>
